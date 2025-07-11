@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "fatfs.h": "c",
+        "dma.h": "c",
+        "main.h": "c",
+        "ads1285.h": "c",
+        "stdio.h": "c",
+        "data_fusion.h": "c",
+        "ff.h": "c"
+    }
+}
