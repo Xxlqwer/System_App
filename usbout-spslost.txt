@@ -1,0 +1,42 @@
+新建文件可以了，但是采集存储写入有问题，连接USB拔出后 运行到MX_SDIO_MMC_Init();里if (HAL_MMC_Init(&hmmc) != HAL_OK)
+  {
+		printf("1");
+    Error_Handler();
+  }，串口打印了1
+
+
+
+
+[18:31:33.793]收←◆FatFs 挂载成功。
+配置文件已存在，跳过创建。
+配置读取完成: sample_rate=2000, space_threshold_mb=3072 MB, board_id=4, use_time_from_config=0, config_time_string=2025-07-09 19:50:00
+
+[18:33:34.166]收←◆GNSS超时未响应，开始采集
+[STATUS] Samples: 0, Lost: 0, Buffers: F:0 W:0 O:0
+新建HEX数据文件: 0:/Board4/20250701025800.hex
+
+[18:34:33.091]收←◆[STATUS] Samples: 24000, Lost: 93842, Buffers: F:93844 W:0 O:93842
+
+[18:35:32.007]收←◆[STATUS] Samples: 24000, Lost: 211675, Buffers: F:117820 W:0 O:117820
+
+[18:35:33.739]收←◆时间变化，准备轮换文件
+新建HEX数据文件: 0:/Board4/20250701030000.hex
+
+[18:36:30.935]收←◆[STATUS] Samples: 24000, Lost: 329534, Buffers: F:117846 W:0 O:117846
+
+[18:37:29.877]收←◆[STATUS] Samples: 24000, Lost: 447417, Buffers: F:117870 W:0 O:117870
+
+[18:38:28.802]收←◆[STATUS] Samples: 24000, Lost: 565267, Buffers: F:117837 W:0 O:117837
+
+[18:39:27.694]收←◆[STATUS] Samples: 24000, Lost: 683051, Buffers: F:117771 W:0 O:117771
+
+[18:40:26.596]收←◆[STATUS] Samples: 24000, Lost: 800855, Buffers: F:117791 W:0 O:117791
+
+[18:41:25.502]收←◆[STATUS] Samples: 24000, Lost: 918668, Buffers: F:117800 W:0 O:117800
+
+[18:41:52.842]收←◆USB连接，暂停采集
+数据文件已关闭（USB插入）
+
+[18:42:21.867]收←◆USB已断开，恢复采集
+
+[18:42:35.896]收←◆1
