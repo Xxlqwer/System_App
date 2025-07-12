@@ -39,6 +39,8 @@ extern MMC_HandleTypeDef hmmc;
 /* USER CODE END Private defines */
 
 void MX_SDIO_MMC_Init(void);
+HAL_StatusTypeDef SDIO_Reinitialize(void);
+HAL_StatusTypeDef MX_SDIO_MMC_Init_Safe(void);
 
 /* USER CODE BEGIN Prototypes */
 

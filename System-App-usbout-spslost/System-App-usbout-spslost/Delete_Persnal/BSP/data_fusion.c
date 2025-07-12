@@ -37,7 +37,7 @@ extern USBD_HandleTypeDef hUsbDeviceHS;  //检测USB状态
 void MainLoop_StateMachine(void)
 {
     uint32_t currentTick = HAL_GetTick();
-		static uint32_t usbDisconnectTick = 0; /* 静态变量只在本函数内维护 USB断开恢复流程 */
+	static uint32_t usbDisconnectTick = 0; /* 静态变量只在本函数内维护 USB断开恢复流程 */
 
     /* 顶层状态判断 */
     if (hUsbDeviceHS.dev_state == USBD_STATE_CONFIGURED)
@@ -47,48 +47,63 @@ void MainLoop_StateMachine(void)
             printf("USB连接，暂停采集\r\n");
             systemState = SYSTEM_USB_CONNECTED;
 					
-					// 关闭 打开的文件（如果有）
-        if (fileCreated)
-        {
-            f_close(&rawDataFile);
-            fileCreated = false;
-            printf("数据文件已关闭（USB插入）\r\n");
-        }
-
+			// 关闭 打开的文件（如果有）
+            if (fileCreated)
+            {
+                f_close(&rawDataFile);
+                fileCreated = false;
+                printf("数据文件已关闭（USB插入）\r\n");
+            }
         }
 
         return;  // USB模式下不做子状态处理
     }
     else
     {
-			// 2. USB未连接状态（插拔后或未接）
-			if (usbDisconnectTick == 0)
-			{
-					usbDisconnectTick = HAL_GetTick();  // 第一次检测断开
-			}
+		// 2. USB未连接状态（插拔后或未接）
+		if (usbDisconnectTick == 0)
+		{
+			usbDisconnectTick = HAL_GetTick();  // 第一次检测断开
+		}
 		
-			if (HAL_GetTick() - usbDisconnectTick > 1000)  // 延时1000ms确认断开
-			{
-				if (systemState != SYSTEM_NORMAL_OPERATION)
-        {
-				 printf("USB已断开，恢复采集\r\n");
+		if (HAL_GetTick() - usbDisconnectTick > 1000)  // 延时1000ms确认断开
+		{
+			if (systemState != SYSTEM_NORMAL_OPERATION)
+            {
+				printf("USB已断开，恢复采集\r\n");
 					
-					// step1: 卸载/重置存储接口，防止FR_LOCKED
+				// step1: 卸载/重置存储接口，防止FR_LOCKED
 				f_mount(NULL, "", 1);
 				__HAL_RCC_SDIO_FORCE_RESET();
 				__HAL_RCC_SDIO_RELEASE_RESET();
 				__HAL_RCC_SDIO_CLK_DISABLE();
 				HAL_Delay(50);  // 稍作延时
 					
-				 // step2: 重初始化SDIO和FatFs
-				MX_SDIO_MMC_Init();
-				printf("[INFO] SDIO初始化完成，准备挂载...\r\n");
+				// step2: 重初始化SDIO和FatFs
+                if (SDIO_Reinitialize() != HAL_OK) 
+                {
+                    printf("SDIO重初始化失败，尝试软复位系统...\r\n");
+                    HAL_Delay(1000);
+                    NVIC_SystemReset(); // 如果SDIO无法恢复，执行系统复位
+                    return;
+                }
 
-				if (FATFS_Mount() != 0)
-				{
-						printf("文件系统挂载失败！\r\n");
-						Error_Handler();  // 或 return，视场景可选
-				}
+                // 挂载文件系统
+                printf("SDIO初始化成功，准备挂载文件系统...\r\n");
+                if (FATFS_Mount() != 0)
+                {
+                    printf("文件系统挂载失败，尝试格式化...\r\n");
+                    Format_EMMC();  // 尝试格式化eMMC
+                    if (FATFS_Mount() != 0) 
+                    {
+                        printf("格式化后挂载仍失败，执行系统复位\r\n");
+                        HAL_Delay(1000);
+                        NVIC_SystemReset();
+                        return;
+                    }
+                }
+        
+                printf("文件系统挂载成功\r\n");
 
 				// step3: 加载配置（可选）
 				printf("[DEBUG] 准备读取 config.txt...\r\n");
@@ -98,7 +113,7 @@ void MainLoop_StateMachine(void)
 				// step4: ADC 恢复配置
 				if (ADS1285_WriteReg_Continuous(&hads1285) != HAL_OK)
 				{
-						printf("ADC配置恢复失败!\r\n");
+					printf("ADC配置恢复失败!\r\n");
 				}
 
 				// step5: 恢复中断与状态
@@ -109,11 +124,9 @@ void MainLoop_StateMachine(void)
 
 				printf("[INFO] 采集系统已恢复运行\r\n");
 		
-				}
-					
-			}
+			}					
+		}
     }
-
     /* 子状态判断（只有在 SYSTEM_NORMAL_OPERATION 下才处理） */
     ProcessSubStateMachine(currentTick);
 }
@@ -128,7 +141,7 @@ void ProcessSubStateMachine(uint32_t currentTick)
     switch (appState)
     {
         case STATE_IDLE:
-                   {
+        {
             if (startupTick == 0) 
             {
                 startupTick = currentTick;
@@ -137,50 +150,50 @@ void ProcessSubStateMachine(uint32_t currentTick)
             if (currentTick - startupTick >= STARTUP_TIMEOUT_MS) 
             {
                 printf("GNSS超时未响应，开始采集\r\n");
-							// 使用 RTC 时间初始化当前文件时间
-							RTC_TimeTypeDef sTime;
-							RTC_DateTypeDef sDate;
-							HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-							HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-							currentFileHour = sTime.Hours;
-							currentFileDay = sDate.Date;
+				
+                // 使用 RTC 时间初始化当前文件时间
+				RTC_TimeTypeDef sTime;
+				RTC_DateTypeDef sDate;
+				HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+				HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+				currentFileHour = sTime.Hours;
+				currentFileDay = sDate.Date;
 							
-              appState = STATE_ACQUIRE;
+                appState = STATE_ACQUIRE;
             }
             break;
         }
 //--------------------------------------------------
         case STATE_GNSS_RECEIVED:
-			 {
-					printf("GNSS: %s", gnssBuffer);
-					extract_time(gnssBuffer);
-					HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, GPIO_PIN_SET); // 授时完成指示
+		{
+			printf("GNSS: %s", gnssBuffer);
+			extract_time(gnssBuffer);
+			HAL_GPIO_WritePin(LED0_GPIO_Port, LED0_Pin, GPIO_PIN_SET); // 授时完成指示
 
-					memset(gnssBuffer, 0, sizeof(gnssBuffer));
-					// 设置当前文件时间
-					RTC_TimeTypeDef sTime;// 获取当前时间
-					RTC_DateTypeDef sDate;// 获取当前日期
-					HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);// 获取当前时间
-					HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);// 获取当前日期
-					currentFileHour = sTime.Hours;// 更新当前文件时间
-					currentFileDay = sDate.Date;// 更新当前文件时间
-					HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
-				 HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-					appState = STATE_ACQUIRE;  // 进入采集模式
+			memset(gnssBuffer, 0, sizeof(gnssBuffer));
+			// 设置当前文件时间
+			RTC_TimeTypeDef sTime;// 获取当前时间
+			RTC_DateTypeDef sDate;// 获取当前日期
+			HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);// 获取当前时间
+			HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);// 获取当前日期
+			currentFileHour = sTime.Hours;// 更新当前文件时间
+			currentFileDay = sDate.Date;// 更新当前文件时间
+			HAL_GPIO_TogglePin(LED0_GPIO_Port, LED0_Pin);
+			HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+			appState = STATE_ACQUIRE;  // 进入采集模式
 
-				 // 避免在 USB 连接时写 FatFs
-				if (hUsbDeviceHS.dev_state == USBD_STATE_CONFIGURED) {
-					printf("当前为USB MSC模式，跳过GNSS数据文件创建。\r\n");
-					
-				}else{			
-					
-				}
-					
-					break;
-						}
+			// 避免在 USB 连接时写 FatFs
+		    if (hUsbDeviceHS.dev_state == USBD_STATE_CONFIGURED) 
+            {
+				printf("当前为USB MSC模式，跳过GNSS数据文件创建。\r\n");					
+			}
+            else
+            {}
+			break;
+		}
 //----------------------------------------------------------
         case STATE_TIMESYNC:
-           {
+        {
             if (needTimeSync && systemState == SYSTEM_NORMAL_OPERATION) 
             {
                 //HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
@@ -190,13 +203,13 @@ void ProcessSubStateMachine(uint32_t currentTick)
                     //printf("授时成功，下次授时在%d小时后\r\n", SYNC_INTERVAL_HOURS);
 //                    CreateNewFileWithTimestamp();
                     // 更新文件时间
-								RTC_TimeTypeDef sTime;
-								RTC_DateTypeDef sDate;
-								HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-								HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-								currentFileHour = sTime.Hours;
-								currentFileDay = sDate.Date;
-								memset(gnssBuffer, 0, sizeof(gnssBuffer));  // 清空残余数据
+					RTC_TimeTypeDef sTime;
+					RTC_DateTypeDef sDate;
+					HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+					HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+					currentFileHour = sTime.Hours;
+					currentFileDay = sDate.Date;
+					memset(gnssBuffer, 0, sizeof(gnssBuffer));  // 清空残余数据
 										
                 } 
                 else 
@@ -214,9 +227,9 @@ void ProcessSubStateMachine(uint32_t currentTick)
         }
 //--------------------------------------------------
         case STATE_ACQUIRE:
-				{
+		{
 	
-						/* -------- 1. 每分钟状态日志：始终先打 -------- */
+			/* -------- 1. 每分钟状态日志：始终先打 -------- */
             if (currentTick - lastReportTick >= 60000) 
             {
                 lastReportTick = currentTick;
@@ -230,7 +243,7 @@ void ProcessSubStateMachine(uint32_t currentTick)
                 writeCompleteCount = 0;
                 bufferOverrunCount = 0;
             }
-						 /* -------- 2. 定时 GNSS 授时 -------- */
+			/* -------- 2. 定时 GNSS 授时 -------- */
             if (currentTick - lastSyncTime >= syncIntervalMs) 
             {
                 needTimeSync = true;
@@ -239,32 +252,34 @@ void ProcessSubStateMachine(uint32_t currentTick)
                 break;
             }
 				
-						/* -------- 3. 12 h 存储空间检查 -------- */ //uint32_t 是无符号整型  不会因溢出而报错
+			/* -------- 3. 12 h 存储空间检查 -------- */ //uint32_t 是无符号整型  不会因溢出而报错
             if (currentTick  - lastSpaceCheck > 12 * 60 * 60 * 1000) 
             {
               CheckStorageSpace();
               lastSpaceCheck = currentTick ;
             }
 
-						 /* -------- 4. 文件轮换检测 -------- */
+			/* -------- 4. 文件轮换检测 -------- */
             CheckAndCreateNewFileIfNeeded();
 
-						 /* -------- 5. 若文件尚不存在则尝试创建 -------- */
+			/* -------- 5. 若文件尚不存在则尝试创建 -------- */
             if (!fileCreated) 
             {
-							FIL* filePtr = FATFS_CreateRawDataFileWithTimestamp();
-							if(filePtr != NULL) 
-							{
-									rawDataFile = *filePtr;
-									fileCreated = true;
-							}else{
-								/* 创建失败也不要 Error_Handler —— 留给下一轮重试 */
-									printf("创建数据文件失败，等待下一轮重试\r\n");
-									break;         
-            }
+				FIL* filePtr = FATFS_CreateRawDataFileWithTimestamp();
+				if(filePtr != NULL) 
+				{
+						rawDataFile = *filePtr;
+						fileCreated = true;
+				}
+                else
+                {
+					/* 创建失败也不要 Error_Handler —— 留给下一轮重试 */
+					printf("创建数据文件失败，等待下一轮重试\r\n");
+					break;         
+                }
 
-						 /* -------- 6. 写缓冲区 -------- */
-            ProcessBuffers();
+				/* -------- 6. 写缓冲区 -------- */
+                ProcessBuffers();
 
 //            if (currentTick - lastSampleTime >= 1000) 
 //            {
@@ -277,10 +292,10 @@ void ProcessSubStateMachine(uint32_t currentTick)
 //            }
             
            
-        }
+            }
 						
-			 break;
-			}
+			break;
+		}
 //--------------------------------------------------
         default:
             break;
@@ -318,16 +333,18 @@ void CheckAndCreateNewFileIfNeeded(void)
     // 检查是否需要创建新文件
     if ((currentFileHour != sTime.Hours) || (currentFileDay != sDate.Date))
     {
-			printf("时间变化，准备轮换文件\r\n");
-			/* ① 先安全关闭当前文件；失败则本轮放弃轮换，等待下一分钟再试 */
-			if (!SafeCloseCurrentFile()) {
-					printf("关闭文件失败，本轮不创建新文件，避免 FR_LOCKED\r\n");
-					return;
-			}
+		printf("时间变化，准备轮换文件\r\n");
+		/* ① 先安全关闭当前文件；失败则本轮放弃轮换，等待下一分钟再试 */
+		if (!SafeCloseCurrentFile()) 
+        {
+			printf("关闭文件失败，本轮不创建新文件，避免 FR_LOCKED\r\n");
+			return;
+		}
 			
-			/* ② 尝试创建新文件 */
+		/* ② 尝试创建新文件 */
         FIL *filePtr = FATFS_CreateRawDataFileWithTimestamp();
-        if (filePtr == NULL) {
+        if (filePtr == NULL) 
+        {
             printf("新建文件失败，本轮写入停用\r\n");
             return;             /* 不再调用 Error_Handler，避免死循环 */
         }
@@ -348,13 +365,15 @@ bool SafeCloseCurrentFile(void)
     FRESULT res;
 
     res = f_sync(&rawDataFile);
-    if (res != FR_OK) {
+    if (res != FR_OK) 
+    {
         printf("f_sync 失败: %d\r\n", res);
         return false;
     }
 
     res = f_close(&rawDataFile);
-    if (res != FR_OK) {
+    if (res != FR_OK) 
+    {
         printf("f_close 失败: %d\r\n", res);  // ?? 你这里没判断！
         return false;
     }
@@ -372,7 +391,8 @@ void SetRTCFromConfigIfNeeded(void)
 
         int year, month, day, hour, min, sec;
         if (sscanf(g_config.config_time_string, "%d-%d-%d %d:%d:%d", 
-                   &year, &month, &day, &hour, &min, &sec) == 6) {
+                   &year, &month, &day, &hour, &min, &sec) == 6) 
+        {
 
             sDate.Year = year - 2000;
             sDate.Month = month;
@@ -532,7 +552,8 @@ void ADS1285_Test(void)
         uint8_t startIndex = nextIndex;
         uint8_t found = 0;
         
-        do {
+        do 
+        {
             // 检查缓冲区是否可用（未满且未锁定）
             if (!g_bufferSystem.buffers[nextIndex].isFull && 
                 !g_bufferSystem.buffers[nextIndex].isLocked) 

@@ -870,14 +870,12 @@ ARM Macro Assembler    Page 14
   447 0000001C                 END
               00000000 
               00000000 
-Command Line: --debug --xref --diag_suppress=9931,A1950W --cpu=Cortex-M4.fp.sp 
---depend=emmc\startup_stm32f429xx.d -oemmc\startup_stm32f429xx.o -I.\RTE\_emmc 
--IE:\APPs\Keil5_Intsall\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include -IE:\APPs\Keil
-5_Intsall\Packs\Keil\STM32F4xx_DFP\2.17.1\Drivers\CMSIS\Device\ST\STM32F4xx\Inc
-lude -IE:\APPs\Keil5_Intsall\Packs\Keil\STM32F4xx_DFP\2.17.1\Device\Include --p
-redefine="__MICROLIB SETA 1" --predefine="__UVISION_VERSION SETA 538" --predefi
-ne="_RTE_ SETA 1" --predefine="STM32F429xx SETA 1" --predefine="_RTE_ SETA 1" -
--list=startup_stm32f429xx.lst startup_stm32f429xx.s
+Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M4.fp --depend=e
+mmc\startup_stm32f429xx.d -oemmc\startup_stm32f429xx.o -I.\RTE\_emmc -ID:\kile5
+\MDK\ARM\PACK\ARM\CMSIS\5.0.1\CMSIS\Include -ID:\kile5\MDK\ARM\PACK\Keil\STM32F
+4xx_DFP\1.0.8\Device\Include --predefine="__MICROLIB SETA 1" --predefine="__UVI
+SION_VERSION SETA 524" --predefine="_RTE_ SETA 1" --predefine="STM32F429_439xx 
+SETA 1" --list=startup_stm32f429xx.lst startup_stm32f429xx.s
 
 
 

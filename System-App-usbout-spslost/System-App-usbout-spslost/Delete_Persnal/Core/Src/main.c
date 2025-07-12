@@ -52,33 +52,6 @@
 
 /* USER CODE BEGIN PV */
 
-
-extern uint8_t data_index;
-
-uint32_t time_1 = 0;
-uint32_t time_2 = 0;
-
-extern uint16_t flush_count;
-uint32_t case2_start_time = 0;
-bool case2_started = false;
-
-
-
-// 三重缓冲系统
-extern volatile BufferSystem g_bufferSystem;
-
-// 调试计数器
-extern uint32_t bufferFullCount;
-extern uint32_t writeCompleteCount;
-extern uint32_t bufferOverrunCount;
-
-extern FIL rawDataFile;  // 二进制数据文件句柄
-
-static bool fileCreated = false;
-//static uint8_t lastRecordedHour =255;  // 初始设为非法小时
-extern uint8_t currentFileHour;    // 初始化为无效值
-extern uint8_t currentFileDay;     // 初始化为无效值
-
 extern uint8_t gnssByte;
 
 /* USER CODE END PV */

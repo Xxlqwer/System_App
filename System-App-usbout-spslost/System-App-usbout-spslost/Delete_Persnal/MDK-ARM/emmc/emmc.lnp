@@ -1,4 +1,4 @@
---cpu=Cortex-M4.fp.sp
+--cpu=Cortex-M4.fp
 "emmc\startup_stm32f429xx.o"
 "emmc\main.o"
 "emmc\gpio.o"
